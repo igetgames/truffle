@@ -4,10 +4,11 @@ var fs = require("fs");
 var path = require('path');
 var mkdirp = require("mkdirp");
 var async = require("async");
-var Sources = require("../lib/sources.js");
+var Resolver = require("truffle-resolver");
+var Artifactor = require("truffle-artifactor");
 var Contracts = require("../lib/contracts.js");
 
-describe('lookups from external sources', function() {
+describe('NPM integration', function() {
   var config;
   var moduleSource = "pragma solidity ^0.4.2; import './ModuleDependency.sol'; contract Module {}";
   var moduleDependencySource = "pragma solidity ^0.4.2; contract ModuleDependency {}";
@@ -18,6 +19,14 @@ describe('lookups from external sources', function() {
     Init.sandbox(function(err, result) {
       if (err) return done(err);
       config = result;
+      config.resolver = new Resolver(config);
+      config.artifactor = new Artifactor(config.contracts_build_directory);
+      config.networks = {
+        development: {
+          network_id: 1
+        }
+      };
+      config.network = "development";
 
       fs.writeFile(path.join(config.contracts_directory, "Parent.sol"), parentContractSource, {encoding: "utf8"}, done());
     });
@@ -34,7 +43,7 @@ describe('lookups from external sources', function() {
   });
 
   it('successfully finds the correct source via Sources lookup', function(done) {
-    Sources.find("fake_source/contracts/Module.sol", config.sources, function(err, body) {
+    config.resolver.resolve("fake_source/contracts/Module.sol", config.sources, function(err, body) {
       if (err) return done(err);
 
       assert.equal(body, moduleSource);
@@ -43,7 +52,7 @@ describe('lookups from external sources', function() {
   });
 
   it("errors when module does not exist from any source", function(done) {
-    Sources.find("some_source/contracts/SourceDoesNotExist.sol", config.sources, function(err, body) {
+    config.resolver.resolve("some_source/contracts/SourceDoesNotExist.sol", config.sources, function(err, body) {
       if (!err) {
         return assert.fail("Source lookup should have errored but didn't");
       }
